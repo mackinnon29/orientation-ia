@@ -21,12 +21,25 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Envoi de message
-    const handleSend = () => {
+    const handleSend = async () => {
         const text = userInput.value.trim();
         if (text) {
             addMessage(text, 'user');
             userInput.value = '';
-            // Ici on appellera plus tard le service IA
+
+            // Simulation de chargement
+            const loadingMsg = addLoadingIndicator();
+
+            try {
+                // Appel au service IA (Mock pour l'instant)
+                const response = await MockAiService.getResponse(text);
+                removeLoadingIndicator(loadingMsg);
+                addMessage(response, 'ai');
+            } catch (error) {
+                removeLoadingIndicator(loadingMsg);
+                addMessage("Désolé, j'ai rencontré une petite erreur de connexion. Pouvez-vous répéter ?", 'ai');
+                console.error(error);
+            }
         }
     };
 
@@ -34,6 +47,27 @@ document.addEventListener('DOMContentLoaded', () => {
     userInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handleSend();
     });
+
+    /**
+     * Ajoute un indicateur de chargement
+     */
+    function addLoadingIndicator() {
+        const msgDiv = document.createElement('div');
+        msgDiv.classList.add('message', 'ai', 'loading');
+        msgDiv.innerHTML = '<span>.</span><span>.</span><span>.</span>';
+        chatMessages.appendChild(msgDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        return msgDiv;
+    }
+
+    /**
+     * Supprime l'indicateur de chargement
+     */
+    function removeLoadingIndicator(el) {
+        if (el && el.parentNode) {
+            el.parentNode.removeChild(el);
+        }
+    }
 
     /**
      * Ajoute un message à l'interface
