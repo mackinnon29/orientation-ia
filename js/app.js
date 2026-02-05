@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Message de bienvenue initial
         setTimeout(() => {
-            addMessage("Bonjour ! Je suis votre assistant d'orientation propulsé par Gemini. Pour commencer, parlez-moi un peu de vous : qu'allez-vous aimer faire durant une journée de travail idéale ?", 'ai');
+            addMessage("Bonjour ! Je suis votre assistant d'orientation. Pour commencer, parlez-moi un peu de vous.", 'ai');
         }, 500);
     });
 
@@ -77,7 +77,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function addMessage(text, sender) {
         const messageDiv = document.createElement('div');
         messageDiv.classList.add('message', sender);
-        messageDiv.textContent = text;
+
+        if (sender === 'ai' && typeof marked !== 'undefined') {
+            messageDiv.innerHTML = marked.parse(text);
+        } else {
+            messageDiv.textContent = text;
+        }
         chatMessages.appendChild(messageDiv);
 
         // Scroll automatique vers le bas

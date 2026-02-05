@@ -56,6 +56,18 @@ const server = http.createServer(async (req, res) => {
 
                 const data = await response.json();
 
+                // Si Google renvoie une erreur (400, 403, 404, etc.)
+                if (!response.ok) {
+                    console.error("❌ Erreur API Gemini (Statut " + response.status + ") :");
+                    console.log(JSON.stringify(data, null, 2));
+                    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: data.error?.message || "Erreur API" }));
+                    return;
+                }
+
+                // Debug : succès (optionnel, à commenter plus tard)
+                // console.log("Réponse reçue avec succès !");
+
                 // Extraction de la réponse texte
                 const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Désolé, je n'ai pas pu générer de réponse.";
 
