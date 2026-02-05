@@ -3,7 +3,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from google import genai
+from google.genai import errors
 from dotenv import load_dotenv
+import tenacity
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 
 # Chargement des variables d'environnement
 load_dotenv()
@@ -55,15 +58,30 @@ async def chat(request: ChatRequest):
         # Ajout du message utilisateur à l'historique
         conversation_history.append({"role": "user", "parts": [{"text": request.message}]})
         
-        # Appel au SDK Gemini (v3)
+        # Appel au SDK Gemini (v3) avec gestion des retries
         # On utilise gemini-3-flash-preview avec instruction système
-        response = client.models.generate_content(
-            model="gemini-3-flash-preview",
-            contents=conversation_history,
-            config=genai.types.GenerateContentConfig(
-                system_instruction=SYSTEM_INSTRUCTION
-            )
+        # On retente si l'erreur mentionne "503" ou "overloaded"
+        
+        def should_retry(exception):
+            error_str = str(exception)
+            return "503" in error_str or "overloaded" in error_str.lower() or "UNAVAILABLE" in error_str
+
+        @retry(
+            stop=stop_after_attempt(5),
+            wait=wait_exponential(multiplier=1, min=1, max=10),
+            retry=retry_if_exception(should_retry),
+            before_sleep=lambda retry_state: print(f"Tentative de retry {retry_state.attempt_number} après erreur : {retry_state.outcome.exception()}")
         )
+        def generate_with_retry():
+            return client.models.generate_content(
+                model="gemini-3-flash-preview",
+                contents=conversation_history,
+                config=genai.types.GenerateContentConfig(
+                    system_instruction=SYSTEM_INSTRUCTION
+                )
+            )
+
+        response = generate_with_retry()
         
         if not response.text:
             raise HTTPException(status_code=500, detail="Désolé, je n'ai pas pu générer de réponse.")
