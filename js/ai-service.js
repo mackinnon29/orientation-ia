@@ -1,17 +1,16 @@
 /**
- * Simple Mock AI Service pour simuler Gemini
+ * Simple Mock AI Service pour simuler GLM 4.7
  */
 const MockAiService = {
     step: 0,
 
     /**
-     * Simule une réponse de Gemini basée sur l'historique ou le niveau de progression
+     * Simule une réponse de GLM 4.7 basée sur l'historique ou le niveau de progression
      * @param {string} userMessage - Le dernier message de l'utilisateur
      * @returns {Promise<string>} - La réponse simulée
      */
     async getResponse(userMessage) {
         return new Promise((resolve) => {
-            // Simulation de temps de réflexion
             const delay = 1000 + Math.random() * 1500;
 
             setTimeout(() => {
@@ -45,25 +44,59 @@ const MockAiService = {
 };
 
 /**
- * Service IA Réel (via Proxy local)
+ * Service IA via OpenAI client (GLM 4.7)
  */
-const GeminiService = {
-    async getResponse(userMessage) {
-        try {
-            const response = await fetch('http://localhost:3000/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: userMessage })
-            });
+const OpenAIService = {
+    async getResponse(userMessage, onStatusUpdate) {
+        const maxRetries = 5;
+        let attempt = 0;
+        const baseDelay = 1000;
 
-            if (!response.ok) throw new Error('Erreur proxy');
+        while (attempt < maxRetries) {
+            attempt++;
+            try {
+                const response = await fetch('http://localhost:3000/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: userMessage })
+                });
 
-            const data = await response.json();
-            return data.response;
-        } catch (error) {
-            console.warn("Proxy inaccessible, fallback sur le MockService.");
-            return MockAiService.getResponse(userMessage);
+                if (response.ok) {
+                    const data = await response.json();
+                    return data.response;
+                }
+
+                if (response.status === 429 || response.status === 503) {
+                    if (onStatusUpdate && attempt < maxRetries) {
+                        onStatusUpdate('retry', attempt);
+                    }
+
+                    if (attempt >= maxRetries) {
+                        throw new Error(`Échec après ${maxRetries} tentatives (statut ${response.status})`);
+                    }
+
+                    const delay = baseDelay * Math.pow(2, attempt - 1);
+                    console.log(`Tentative ${attempt}/${maxRetries} échouée (${response.status}), nouvel essai dans ${delay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                    throw new Error(`Erreur HTTP ${response.status}`);
+                }
+
+            } catch (error) {
+                if (attempt >= maxRetries) {
+                    console.warn("⚠️ Proxy OpenAI en erreur après tous les retries, fallback sur le MockService.", error);
+                    const mockResponse = await MockAiService.getResponse(userMessage);
+                    return `[MODE MOCK] ${mockResponse}`;
+                }
+                
+                const delay = baseDelay * Math.pow(2, attempt - 1);
+                console.log(`Erreur de connexion, tentative ${attempt}/${maxRetries}, nouvel essai dans ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
         }
+
+        const mockResponse = await MockAiService.getResponse(userMessage);
+        return `[MODE MOCK] ${mockResponse}`;
     }
 };
 
@@ -71,4 +104,4 @@ const GeminiService = {
  * Sélecteur de service
  * Permet de basculer facilement. On utilise le Mock par défaut si on n'est pas sûr.
  */
-const AiService = GeminiService; // Changez pour MockAiService pour tester hors-ligne
+const AiService = OpenAIService; // Changez pour MockAiService pour tester hors-ligne

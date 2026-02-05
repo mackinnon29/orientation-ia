@@ -2,38 +2,66 @@ import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from google import genai
-from google.genai import errors
+from openai import OpenAI, APIError, RateLimitError, AuthenticationError, APIStatusError
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    RetryError,
+)
 from dotenv import load_dotenv
-import tenacity
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
+import random
 
 # Chargement des variables d'environnement
 load_dotenv()
 
-# Configuration de l'API Gemini
-API_KEY = os.getenv("GEMINI_API_KEY")
-if not API_KEY:
-    print("ERREUR : La variable GEMINI_API_KEY n'est pas définie dans le fichier .env")
-    exit(1)
+# Configuration de l'API OpenAI (GLM 4.7)
+API_KEY = os.getenv("OPENAI_API_KEY") or "sk-test-key-for-mocking"
 
 # Initialisation de FastAPI
-app = FastAPI(title="Gemini Proxy Server")
+app = FastAPI(title="OpenAI Proxy Server (GLM 4.7)")
 
 # Gestion des CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # À restreindre en production
+    allow_origins=["*"],
     allow_methods=["POST", "OPTIONS"],
     allow_headers=["Content-Type"],
 )
 
-# Initialisation du client Gemini
-client = genai.Client(api_key=API_KEY)
+# Messages humoristiques pour les retries
+RETRY_MESSAGES = [
+    "L'IA fait une petite sieste... On réveille les neurones !",
+    "Le modèle médite sur l'existence... Patience !",
+    "Réessai de connexion - Les hamsters courent plus vite !",
+    "Tentative de sauvetage en cours...",
+    "Le serveur boit son café, on attend...",
+]
+
+
+def get_retry_message():
+    return random.choice(RETRY_MESSAGES)
+
+
+# Initialisation du client OpenAI avec base_url GLM 4.7
+client = OpenAI(
+    api_key=API_KEY,
+    base_url="https://api.z.ai/api/coding/paas/v4",
+    max_retries=0,
+)
 
 # Stockage simple de l'historique (en mémoire, par session)
-# Note: Dans une vraie appli, on utiliserait une base de données ou un cache
 conversation_history = []
+
+
+@app.post("/api/reset")
+async def reset():
+    global conversation_history
+    conversation_history = []
+    print("Historique réinitialisé.")
+    return {"status": "reset"}
+
 
 SYSTEM_INSTRUCTION = """
 Tu es un assistant d'orientation scolaire et professionnelle expert. 
@@ -49,53 +77,77 @@ Règles de conduite :
 7. Utilise le format Markdown pour tes réponses (gras, listes si nécessaire pour clarifier une question).
 """
 
+
 class ChatRequest(BaseModel):
     message: str
+
+
+def should_retry(retry_state):
+    """Détermine si on doit réessayer selon l'exception."""
+    exception = retry_state.outcome.exception()
+    if isinstance(exception, APIStatusError):
+        return exception.status_code not in [400, 401]
+    return False
+
+
+@retry(
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    retry=should_retry,
+    before_sleep=lambda retry_state: print(
+        f"ℹ️ {get_retry_message()} (Tentative {retry_state.attempt_number}/5)"
+    ),
+    reraise=True,
+)
+def call_openai_api(messages):
+    return client.chat.completions.create(model="glm-4.7", messages=messages)
+
 
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     try:
-        # Ajout du message utilisateur à l'historique
-        conversation_history.append({"role": "user", "parts": [{"text": request.message}]})
-        
-        # Appel au SDK Gemini (v3) avec gestion des retries
-        # On utilise gemini-3-flash-preview avec instruction système
-        # On retente si l'erreur mentionne "503" ou "overloaded"
-        
-        def should_retry(exception):
-            error_str = str(exception)
-            return "503" in error_str or "overloaded" in error_str.lower() or "UNAVAILABLE" in error_str
+        print(f"Message reçu : {request.message}")
+        conversation_history.append({"role": "user", "content": request.message})
 
-        @retry(
-            stop=stop_after_attempt(5),
-            wait=wait_exponential(multiplier=1, min=1, max=10),
-            retry=retry_if_exception(should_retry),
-            before_sleep=lambda retry_state: print(f"Tentative de retry {retry_state.attempt_number} après erreur : {retry_state.outcome.exception()}")
+        messages = [
+            {"role": "system", "content": SYSTEM_INSTRUCTION},
+            *conversation_history,
+        ]
+
+        print(
+            f"Appel GLM 4.7 via OpenAI client (historique: {len(conversation_history)} messages)..."
         )
-        def generate_with_retry():
-            return client.models.generate_content(
-                model="gemini-3-flash-preview",
-                contents=conversation_history,
-                config=genai.types.GenerateContentConfig(
-                    system_instruction=SYSTEM_INSTRUCTION
-                )
+        response = call_openai_api(messages)
+
+        if not response.choices or not response.choices[0].message.content:
+            print("Erreur : réponse vide")
+            raise HTTPException(
+                status_code=500, detail="Désolé, je n'ai pas pu générer de réponse."
             )
 
-        response = generate_with_retry()
-        
-        if not response.text:
-            raise HTTPException(status_code=500, detail="Désolé, je n'ai pas pu générer de réponse.")
-        
-        # Ajout de la réponse de l'IA à l'historique
-        conversation_history.append({"role": "model", "parts": [{"text": response.text}]})
-            
-        return {"response": response.text}
+        assistant_message = response.choices[0].message.content
+        conversation_history.append({"role": "assistant", "content": assistant_message})
+        print(f"Réponse générée ({len(assistant_message)} caractères)")
 
+        return {"response": assistant_message}
+
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail="Clé API invalide")
+    except RateLimitError as e:
+        raise HTTPException(status_code=429, detail=f"Quota dépassé : {e}")
+    except APIStatusError as e:
+        if e.status_code == 503:
+            raise HTTPException(status_code=503, detail="Service indisponible")
+        raise HTTPException(
+            status_code=e.status_code, detail=f"Erreur API : {e.message}"
+        )
     except Exception as e:
-        print(f"Erreur lors de l'appel à Gemini : {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Erreur inattendue : {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur : {str(e)}")
+
 
 if __name__ == "__main__":
     import uvicorn
+
     print("\033[32m✓ Serveur Proxy (Python) démarré sur http://localhost:3000\033[0m")
     uvicorn.run(app, host="0.0.0.0", port=3000)
