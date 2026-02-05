@@ -31,8 +31,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const loadingMsg = addLoadingIndicator();
 
             try {
-                // Appel au service IA (Mock pour l'instant)
-                const response = await MockAiService.getResponse(text);
+                // Appel au service IA
+                const response = await AiService.getResponse(text);
                 removeLoadingIndicator(loadingMsg);
                 addMessage(response, 'ai');
             } catch (error) {

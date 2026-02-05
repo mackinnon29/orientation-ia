@@ -1,0 +1,80 @@
+const http = require('http');
+
+/**
+ * SERVEUR PROXY MINIMALISTE POUR GEMINI
+ * 
+ * Ce serveur protège votre clé API. Au lieu d'appeler Google depuis le navigateur,
+ * le navigateur appelle ce serveur, qui appelle ensuite Google.
+ */
+
+// Port du serveur
+const PORT = 3000;
+
+// On récupère la clé API depuis l'environnement
+const API_KEY = process.env.GEMINI_API_KEY;
+
+if (!API_KEY) {
+    console.error("ERREUR : La variable GEMINI_API_KEY n'est pas définie.");
+    console.log("Assurez-vous d'avoir créé le fichier .env et de lancer avec : node --env-file=.env server.js");
+    process.exit(1);
+}
+
+const server = http.createServer(async (req, res) => {
+    // Gestion des CORS (pour permettre au frontend de parler au backend)
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    // Réponse aux requêtes de pré-vérification (CORS)
+    if (req.method === 'OPTIONS') {
+        res.writeHead(204);
+        res.end();
+        return;
+    }
+
+    // On ne gère que les POST sur /api/chat
+    if (req.method === 'POST' && req.url === '/api/chat') {
+        let body = '';
+        req.on('data', chunk => body += chunk.toString());
+
+        req.on('end', async () => {
+            try {
+                const { message } = JSON.parse(body);
+
+                // Appel à l'API Gemini via REST
+                const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+
+                const response = await fetch(geminiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{ text: message }]
+                        }]
+                    })
+                });
+
+                const data = await response.json();
+
+                // Extraction de la réponse texte
+                const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Désolé, je n'ai pas pu générer de réponse.";
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ response: aiText }));
+
+            } catch (error) {
+                console.error("Erreur serveur :", error);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: "Erreur lors du traitement de la requête." }));
+            }
+        });
+    } else {
+        res.writeHead(404);
+        res.end();
+    }
+});
+
+server.listen(PORT, () => {
+    console.log(`\x1b[32m%s\x1b[0m`, `✓ Serveur Proxy démarré sur http://localhost:${PORT}`);
+    console.log(`Utilisez Ctrl+C pour arrêter le serveur.`);
+});
