@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatMessages = document.getElementById('chat-messages');
     const userInput = document.getElementById('user-input');
     const sendBtn = document.getElementById('send-btn');
+    const aiBehavior = document.getElementById('ai-behavior');
 
     // Transition vers le chat
     startBtn.addEventListener('click', () => {
@@ -58,8 +59,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 };
 
-                // Appel au service IA avec callback
-                const response = await AiService.getResponse(text, onStatusUpdate);
+                // Appel au service IA avec callback et comportement
+                const behavior = aiBehavior ? aiBehavior.value : 'nice';
+                const response = await AiService.getResponse(text, onStatusUpdate, behavior);
 
                 // Nettoyage
                 clearTimeout(funnyMsgInterval);

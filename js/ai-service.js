@@ -9,19 +9,23 @@ const MockAiService = {
      * @param {string} userMessage - Le dernier message de l'utilisateur
      * @returns {Promise<string>} - La réponse simulée
      */
-    async getResponse(userMessage) {
+    async getResponse(userMessage, onStatusUpdate, behavior = 'nice') {
         return new Promise((resolve) => {
             const delay = 1000 + Math.random() * 1500;
 
             setTimeout(() => {
                 this.step++;
-                resolve(this.generateMockResponse(userMessage));
+                resolve(this.generateMockResponse(userMessage, behavior));
             }, delay);
         });
     },
 
-    generateMockResponse(input) {
+    generateMockResponse(input, behavior) {
         const text = input.toLowerCase();
+
+        if (behavior === 'caustic') {
+            return "Encore un indécis ? Écoute, j'ai pas toute la journée. Dis-moi ce que tu sais faire concrètement, si tant est que tu possèdes la moindre compétence utile. On avance ou tu préfères continuer à rêver ?";
+        }
 
         if (this.step === 1) {
             return "C'est un excellent point de départ ! Pour mieux comprendre vos affinités, préférez-vous travailler avec des outils techniques (ordinateur, machines) ou plutôt avec des personnes (conseil, gestion d'équipe) ?";
@@ -47,7 +51,7 @@ const MockAiService = {
  * Service IA via OpenAI client (GLM 4.7)
  */
 const OpenAIService = {
-    async getResponse(userMessage, onStatusUpdate) {
+    async getResponse(userMessage, onStatusUpdate, behavior = 'nice') {
         const maxRetries = 5;
         let attempt = 0;
         const baseDelay = 1000;
@@ -58,7 +62,7 @@ const OpenAIService = {
                 const response = await fetch('http://localhost:3000/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: userMessage })
+                    body: JSON.stringify({ message: userMessage, behavior: behavior })
                 });
 
                 if (response.ok) {
@@ -85,17 +89,17 @@ const OpenAIService = {
             } catch (error) {
                 if (attempt >= maxRetries) {
                     console.warn("⚠️ Proxy OpenAI en erreur après tous les retries, fallback sur le MockService.", error);
-                    const mockResponse = await MockAiService.getResponse(userMessage);
+                    const mockResponse = await MockAiService.getResponse(userMessage, onStatusUpdate, behavior);
                     return `[MODE MOCK] ${mockResponse}`;
                 }
-                
+
                 const delay = baseDelay * Math.pow(2, attempt - 1);
                 console.log(`Erreur de connexion, tentative ${attempt}/${maxRetries}, nouvel essai dans ${delay}ms...`);
                 await new Promise(resolve => setTimeout(resolve, delay));
             }
         }
 
-        const mockResponse = await MockAiService.getResponse(userMessage);
+        const mockResponse = await MockAiService.getResponse(userMessage, onStatusUpdate, behavior);
         return `[MODE MOCK] ${mockResponse}`;
     }
 };

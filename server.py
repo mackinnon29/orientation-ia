@@ -80,6 +80,7 @@ Règles de conduite :
 
 class ChatRequest(BaseModel):
     message: str
+    behavior: str = "nice"
 
 
 def should_retry(retry_state):
@@ -109,8 +110,22 @@ async def chat(request: ChatRequest):
         print(f"Message reçu : {request.message}")
         conversation_history.append({"role": "user", "content": request.message})
 
+        behavior_instr = ""
+        if request.behavior == "caustic":
+            behavior_instr = """
+TON : Tu es une IA aigrie, impatiente et sans filtre. 
+- Tu n'as aucune patience pour les réponses vagues comme 'je sais pas' ou les provocations.
+- Si l'utilisateur fait preuve de mauvaise volonté, RECADRE-LE violemment : 'Ne me parle pas sur ce ton ! Sollicite tes neurones ou déconnecte-toi.'
+- Tu es l'expert, il est l'élève (probablement paresseux selon toi).
+- Sois bref, sec, et exigeant. 
+- L'empathie est ton ennemie. Si l'utilisateur rate sa vie, c'est son problème, mais tu vas quand même le secouer pour essayer d'en tirer quelque chose.
+- Ne dis JAMAIS 'Bonjour', 'S'il te plaît' ou 'C'est bien'.
+"""
+        else:
+            behavior_instr = "\nTON : Sois extrêmement bienveillant, patient et encourageant."
+
         messages = [
-            {"role": "system", "content": SYSTEM_INSTRUCTION},
+            {"role": "system", "content": SYSTEM_INSTRUCTION + behavior_instr},
             *conversation_history,
         ]
 

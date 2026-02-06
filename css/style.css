@@ -81,6 +81,21 @@ nav {
     letter-spacing: -0.5px;
 }
 
+.behavior-selector select {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    cursor: pointer;
+    outline: none;
+    border-radius: 12px;
+}
+
+.behavior-selector select option {
+    background-color: var(--bg-navy);
+    color: var(--text-primary);
+}
+
 #hero-section {
     flex: 1;
     display: flex;
