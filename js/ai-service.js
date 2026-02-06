@@ -20,6 +20,11 @@ const MockAiService = {
         });
     },
 
+    async setGeneralAnswers(answers) {
+        console.log("MockAiService: Réponses générales enregistrées", answers);
+        return true;
+    },
+
     generateMockResponse(input, behavior) {
         const text = input.toLowerCase();
 
@@ -101,6 +106,20 @@ const OpenAIService = {
 
         const mockResponse = await MockAiService.getResponse(userMessage, onStatusUpdate, behavior);
         return `[MODE MOCK] ${mockResponse}`;
+    },
+
+    async setGeneralAnswers(answers) {
+        try {
+            const response = await fetch('http://localhost:3000/api/set_general_answers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ answers: answers.map(a => `${a.letter}. ${a.text}`) })
+            });
+            return response.ok;
+        } catch (error) {
+            console.error("Erreur lors de l'envoi des réponses générales:", error);
+            return false;
+        }
     }
 };
 

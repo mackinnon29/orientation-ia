@@ -53,14 +53,30 @@ client = OpenAI(
 
 # Stockage simple de l'historique (en mémoire, par session)
 conversation_history = []
+general_answers = []
+custom_question_count = 0
 
 
 @app.post("/api/reset")
 async def reset():
-    global conversation_history
+    global conversation_history, general_answers, custom_question_count
     conversation_history = []
-    print("Historique réinitialisé.")
+    general_answers = []
+    custom_question_count = 0
+    print("Historique et état réinitialisés.")
     return {"status": "reset"}
+
+
+class GeneralAnswersRequest(BaseModel):
+    answers: list[str]
+
+
+@app.post("/api/set_general_answers")
+async def set_general_answers(request: GeneralAnswersRequest):
+    global general_answers
+    general_answers = request.answers
+    print(f"Réponses générales reçues : {len(general_answers)}")
+    return {"status": "success"}
 
 
 # Instructions de base : le rôle et la méthode
@@ -310,8 +326,33 @@ async def chat(request: ChatRequest):
         else:
             behavior_instr = NICE_BEHAVIOR
 
+        # Gestion de la conclusion après 7 questions personnalisées
+        global custom_question_count
+        custom_question_count += 1
+        print(f"Question personnalisée n°{custom_question_count}")
+
+        final_recommendation_instr = ""
+        if custom_question_count >= 7:
+            print("Déclenchement de la conclusion finale.")
+            answers_summary = ", ".join(general_answers)
+            final_recommendation_instr = f"""
+# MISSION FINALE : CONCLUSION ET RECOMMANDATION
+C'est le moment de conclure. En te basant sur :
+1. Les 7 réponses générales de l'utilisateur : {answers_summary}
+2. Les 7 réponses personnalisées dans l'historique ci-dessous.
+
+TU DOIS MAINTENANT :
+- Proposer UN ou DEUX métiers (ou un corps de métier) qui correspondent précisément au profil.
+- Justifier brièvement ton choix en faisant le lien avec ses réponses.
+- Garder ton comportement actuel ({request.behavior}) tout en étant concret.
+- Ne pose PLUS de question. C'est le mot de la fin.
+"""
+
         messages = [
-            {"role": "system", "content": CORE_MISSION + behavior_instr},
+            {
+                "role": "system",
+                "content": CORE_MISSION + behavior_instr + final_recommendation_instr,
+            },
             *conversation_history,
         ]
 

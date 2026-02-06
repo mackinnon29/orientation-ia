@@ -94,6 +94,10 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             isGeneralPhase = false;
             const summary = userAnswers.map(a => a.text).join(', ');
+
+            // Envoyer les réponses au serveur pour le contexte futur
+            AiService.setGeneralAnswers(userAnswers);
+
             addMessage(`Merci pour ces réponses ! J'ai bien noté que tu préfères : ${summary}. Par quoi souhaites-tu commencer notre exploration ?`, 'ai');
         }
     }
