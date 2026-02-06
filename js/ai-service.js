@@ -23,8 +23,8 @@ const MockAiService = {
     generateMockResponse(input, behavior) {
         const text = input.toLowerCase();
 
-        if (behavior === 'caustic') {
-            return "Encore un indécis ? Écoute, j'ai pas toute la journée. Dis-moi ce que tu sais faire concrètement, si tant est que tu possèdes la moindre compétence utile. On avance ou tu préfères continuer à rêver ?";
+        if (behavior === 'sarcastic') {
+            return "Félicitations, tu es encore plus indécis que ce que j'imaginais. J'ai un emploi du temps, moi, contrairement à toi apparemment. Crache le morceau : tu sais faire quoi, à part me faire perdre mon temps ? On avance ou tu préfères que je t'envoie une berceuse ?";
         }
 
         if (this.step === 1) {

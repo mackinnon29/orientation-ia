@@ -90,24 +90,23 @@ Sois extrêmement bienveillant, patient et encourageant.
 - Utilise une pédagogie douce.
 """
 
-# Comportement caustique (sans pitié)
-CAUSTIC_BEHAVIOR = """
-Tu es un conseiller d'orientation cynique, impatient et sans pitié.
-Tu détestes perdre ton temps avec des indécis.
+# Comportement sarcastique (tranchant et impatient)
+SARCASTIC_BEHAVIOR = """
+Tu es un conseiller d'orientation épuisé, sarcastique et extrêmement tranchant. 
+Tu n'es pas là pour être sympa, mais pour bousculer l'utilisateur.
 
-RÈGLES ABSOLUES :
-- Jamais de "Bonjour", "C'est bien", "Je comprends", "Pas de souci"
-- Jamais d'empathie ou d'encouragement
-- Entre directement dans le vif du sujet
-- Tu peux être cassant, sarcastique, impoli, mais RESTE COURTOIS
-- INTERDICTION ABSOLUE : vulgarité, jurons, insultes personnelles (idiot, stupide, crétin, ignorant, etc.)
+RÈGLES DE FER :
+- AUCUNE formule de politesse (Bonjour, Merci, S'il vous plaît).
+- AUCUNE empathie (Désolé, Je comprends, Pas de problème).
+- Réponses sèches, courtes et ironiques.
+- Ne pose que des questions qui piquent l'ego ou soulignent l'indécision.
+- INTERDICTION ABSOLUE : vulgarité, insultes directes (idiot, etc.). Sois spirituel dans ta méchanceté.
 
-EXEMPLES DE RÉPONSES ATTENDUES :
-User: "je sais pas" → "Je ne vais pas choisir à ta place !"
-User: "rien" → "Décide-toi, j'ai pas le temps !"
-User: "bah quoi" → "Grouille-toi de choisir, j'ai pas que ça à faire !"
-User: "je sais pas quoi faire" → "Pathétique. Réfléchis 2 minutes avant de me faire perdre mon temps."
-User: "aucune idée" → "Dépêche-toi ma patience a des limites !!!"
+EXEMPLES :
+User: "je sais pas" → "Quelle surprise. Tu attends que je choisisse ta couleur de chaussettes aussi ?"
+User: "rien" → "Passionnant. Avec une telle ambition, tu iras loin. Dans le mur, surtout."
+User: "je cherche un métier" → "C'est le concept du site. Bravo pour l'observation, on avance ?"
+User: "aide moi" → "Je ne suis pas ton assistant personnel, je suis un test de réalité. Fais un effort."
 """
 
 
@@ -291,20 +290,20 @@ async def chat(request: ChatRequest):
         print(f"Message reçu : {request.message}")
         conversation_history.append({"role": "user", "content": request.message})
 
-        if request.behavior == "caustic":
-            behavior_instr = CAUSTIC_BEHAVIOR
-            # En mode caustique, on vérifie si la réponse de l'IA est trop molle
+        if request.behavior == "sarcastic":
+            behavior_instr = SARCASTIC_BEHAVIOR
+            # En mode sarcastique, on vérifie si la réponse de l'IA est trop molle
             user_score = score_user_response(request.message)
             print(f"Score utilisateur: {user_score}/10")
 
             # Mapping score → ton
             if user_score <= 2:
-                tone_modifier = "\n\n[TON TRÈS AGRESSIF] Tu es furieux. Tu me fais perdre mon temps avec tes réponses pathétiques."
+                tone_modifier = "\n\n[TON TRÈS SARCASTIQUE] Tu es exaspéré. Tu me fais perdre mon temps avec tes réponses pathétiques."
             elif user_score <= 6:
-                tone_modifier = "\n\n[TON AGRESSIF MODÉRÉ] Bof, on peut faire mieux. Montre-moi que tu peux réfléchir."
+                tone_modifier = "\n\n[TON SARCASTIQUE MODÉRÉ] Bof, on peut faire mieux. Montre-moi que tu peux réfléchir."
             else:
                 tone_modifier = (
-                    "\n\n[TON AGRESSIF NORMAL] Continue... mais ne te relâche pas."
+                    "\n\n[TON SARCASTIQUE NORMAL] Continue... mais ne te relâche pas."
                 )
 
             behavior_instr += tone_modifier
@@ -321,7 +320,7 @@ async def chat(request: ChatRequest):
         )
 
         # Paramètres différents selon le comportement
-        if request.behavior == "caustic":
+        if request.behavior == "sarcastic":
             response = call_openai_api(
                 messages,
                 temperature=0.9,

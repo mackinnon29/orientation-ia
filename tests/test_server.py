@@ -170,7 +170,7 @@ async def test_conversation_history_persistence():
         assert conversation_history[3]["role"] == "assistant"
 
 
-# Tests pour le comportement caustique
+# Tests pour le comportement sarcastique
 from server import is_weak_response, score_user_response, WEAK_WORDS
 
 
@@ -253,10 +253,10 @@ def test_score_user_response_avoidance():
 
 
 @pytest.mark.asyncio
-async def test_caustic_behavior():
-    """Vérifie que le mode caustic utilise les bons paramètres."""
+async def test_sarcastic_behavior():
+    """Vérifie que le mode sarcastique utilise les bons paramètres."""
     mock_response = MagicMock()
-    mock_response.choices[0].message.content = "Réponse caustique"
+    mock_response.choices[0].message.content = "Réponse sarcastique"
 
     with patch.object(
         client.chat.completions, "create", return_value=mock_response
@@ -264,11 +264,11 @@ async def test_caustic_behavior():
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             response = await ac.post(
-                "/api/chat", json={"message": "je sais pas", "behavior": "caustic"}
+                "/api/chat", json={"message": "je sais pas", "behavior": "sarcastic"}
             )
 
         assert response.status_code == 200
-        # Vérifie que les paramètres caustiques sont utilisés
+        # Vérifie que les paramètres sarcastiques sont utilisés
         call_kwargs = mock_create.call_args[1]
         assert call_kwargs["temperature"] == 0.9
         assert call_kwargs["frequency_penalty"] == 0.5
@@ -276,27 +276,25 @@ async def test_caustic_behavior():
 
 
 @pytest.mark.asyncio
-async def test_caustic_few_shot_examples():
-    """Vérifie que les exemples few-shot sont présents dans le prompt caustique."""
-    from server import CAUSTIC_BEHAVIOR
+async def test_sarcastic_few_shot_examples():
+    """Vérifie que les exemples few-shot sont présents dans le prompt sarcastique."""
+    from server import SARCASTIC_BEHAVIOR
 
     # Vérifie la présence des exemples few-shot
-    assert 'User: "je sais pas"' in CAUSTIC_BEHAVIOR
-    assert 'User: "rien"' in CAUSTIC_BEHAVIOR
-    assert 'User: "bah quoi"' in CAUSTIC_BEHAVIOR
-    assert 'User: "je sais pas quoi faire"' in CAUSTIC_BEHAVIOR
-    assert 'User: "aucune idée"' in CAUSTIC_BEHAVIOR
+    assert 'User: "je sais pas"' in SARCASTIC_BEHAVIOR
+    assert 'User: "rien"' in SARCASTIC_BEHAVIOR
+    assert 'User: "je cherche un métier"' in SARCASTIC_BEHAVIOR
+    assert 'User: "aide moi"' in SARCASTIC_BEHAVIOR
 
     # Vérifie les réponses attendues
-    assert "Je ne vais pas choisir à ta place" in CAUSTIC_BEHAVIOR
-    assert "Décide-toi, j'ai pas le temps" in CAUSTIC_BEHAVIOR
-    assert "Grouille-toi de choisir" in CAUSTIC_BEHAVIOR
-    assert "Pathétique" in CAUSTIC_BEHAVIOR
-    assert "Dépêche-toi ma patience a des limites" in CAUSTIC_BEHAVIOR
+    assert "Quelle surprise" in SARCASTIC_BEHAVIOR
+    assert "Passionnant" in SARCASTIC_BEHAVIOR
+    assert "Bravo pour l'observation" in SARCASTIC_BEHAVIOR
+    assert "Je ne suis pas ton assistant personnel" in SARCASTIC_BEHAVIOR
 
     # Vérifie l'interdiction des insultes
-    assert "vulgarité" in CAUSTIC_BEHAVIOR.lower()
-    assert "insultes" in CAUSTIC_BEHAVIOR.lower()
-    # Vérifie que "ignorant" n'apparaît pas dans les exemples de réponses (mais peut être dans les règles)
-    examples_section = CAUSTIC_BEHAVIOR.split("EXEMPLES DE RÉPONSES ATTENDUES :")[1]
-    assert "ignorant" not in examples_section.lower()
+    assert "vulgarité" in SARCASTIC_BEHAVIOR.lower()
+    assert "insultes" in SARCASTIC_BEHAVIOR.lower()
+    # Vérifie que "ignorant" et "légume" n'apparaissent pas
+    assert "ignorant" not in SARCASTIC_BEHAVIOR.lower()
+    assert "légume" not in SARCASTIC_BEHAVIOR.lower()
